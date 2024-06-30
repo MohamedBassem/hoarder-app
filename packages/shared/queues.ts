@@ -83,3 +83,27 @@ export function triggerSearchDeletion(bookmarkId: string) {
     type: "delete",
   });
 }
+
+export const zvideoRequestSchema = z.object({
+  bookmarkId: z.string(),
+  url: z.string(),
+});
+export type ZVideoRequest = z.infer<typeof zvideoRequestSchema>;
+
+export const VideoWorkerQueue = new Queue<ZVideoRequest, void>("video_queue", {
+  connection: queueConnectionDetails,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: "exponential",
+      delay: 500,
+    },
+  },
+});
+
+export function triggerVideoWorker(bookmarkId: string, url: string) {
+  VideoWorkerQueue.add("video_queue", {
+    bookmarkId,
+    url,
+  });
+}

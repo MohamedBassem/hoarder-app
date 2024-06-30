@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 import { BookmarkTypes } from "@hoarder/shared/types/bookmarks";
+import { DBAssetTypes } from "@hoarder/shared/utils/bookmarkUtils";
 
 function createdAtField() {
   return integer("createdAt", { mode: "timestamp" })
@@ -160,12 +161,6 @@ export const bookmarkLinks = sqliteTable(
   },
 );
 
-export const enum AssetTypes {
-  LINK_BANNER_IMAGE = "linkBannerImage",
-  LINK_SCREENSHOT = "linkScreenshot",
-  LINK_FULL_PAGE_ARCHIVE = "linkFullPageArchive",
-}
-
 export const assets = sqliteTable(
   "assets",
   {
@@ -173,9 +168,10 @@ export const assets = sqliteTable(
     id: text("id").notNull().primaryKey(),
     assetType: text("assetType", {
       enum: [
-        AssetTypes.LINK_BANNER_IMAGE,
-        AssetTypes.LINK_SCREENSHOT,
-        AssetTypes.LINK_FULL_PAGE_ARCHIVE,
+        DBAssetTypes.LINK_BANNER_IMAGE,
+        DBAssetTypes.LINK_SCREENSHOT,
+        DBAssetTypes.LINK_FULL_PAGE_ARCHIVE,
+        DBAssetTypes.LINK_VIDEO,
       ],
     }).notNull(),
     bookmarkId: text("bookmarkId")
