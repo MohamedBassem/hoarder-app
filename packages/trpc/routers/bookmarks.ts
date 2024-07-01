@@ -11,7 +11,6 @@ import type { ZBookmarkTags } from "@hoarder/shared/types/tags";
 import { db as DONT_USE_db } from "@hoarder/db";
 import {
   assets,
-  AssetTypes,
   bookmarkAssets,
   bookmarkLinks,
   bookmarks,
@@ -38,6 +37,7 @@ import {
   zNewBookmarkRequestSchema,
   zUpdateBookmarksRequestSchema,
 } from "@hoarder/shared/types/bookmarks";
+import { mapAssetsToBookmarkFields } from "@hoarder/shared/utils/bookmarkUtils";
 
 import type { AuthedContext, Context } from "../index";
 import { authedProcedure, router } from "../index";
@@ -73,25 +73,6 @@ export const ensureBookmarkOwnership = experimental_trpcMiddleware<{
 
   return opts.next();
 });
-
-interface Asset {
-  id: string;
-  assetType: AssetTypes;
-}
-
-const ASSET_TYE_MAPPING: Record<AssetTypes, string> = {
-  [AssetTypes.LINK_SCREENSHOT]: "screenshotAssetId",
-  [AssetTypes.LINK_FULL_PAGE_ARCHIVE]: "fullPageArchiveAssetId",
-  [AssetTypes.LINK_BANNER_IMAGE]: "imageAssetId",
-};
-
-function mapAssetsToBookmarkFields(assets: Asset | Asset[] = []) {
-  const assetsArray = Array.isArray(assets) ? assets : [assets];
-  return assetsArray.reduce((result: Record<string, string>, asset: Asset) => {
-    result[ASSET_TYE_MAPPING[asset.assetType]] = asset.id;
-    return result;
-  }, {});
-}
 
 async function getBookmark(ctx: AuthedContext, bookmarkId: string) {
   const bookmark = await ctx.db.query.bookmarks.findFirst({

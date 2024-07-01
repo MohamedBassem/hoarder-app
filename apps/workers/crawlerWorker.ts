@@ -25,22 +25,15 @@ import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { withTimeout } from "utils";
 
-import type { ZCrawlLinkRequest } from "@hoarder/shared/queues";
-import { db, HoarderDBTransaction } from "@hoarder/db";
-import {
-  assets,
-  AssetTypes,
-  bookmarkAssets,
-  bookmarkLinks,
-  bookmarks,
-} from "@hoarder/db/schema";
+import { db } from "@hoarder/db";
+import { bookmarkAssets, bookmarkLinks, bookmarks } from "@hoarder/db/schema";
 import {
   ASSET_TYPES,
-  deleteAsset,
   IMAGE_ASSET_TYPES,
   newAssetId,
   saveAsset,
   saveAssetFromFile,
+  silentDeleteAsset,
   SUPPORTED_UPLOAD_ASSET_TYPES,
 } from "@hoarder/shared/assetdb";
 import serverConfig from "@hoarder/shared/config";
@@ -50,9 +43,14 @@ import {
   OpenAIQueue,
   queueConnectionDetails,
   triggerSearchReindex,
+  triggerVideoWorker,
+  ZCrawlLinkRequest,
   zCrawlLinkRequestSchema,
 } from "@hoarder/shared/queues";
 import { BookmarkTypes } from "@hoarder/shared/types/bookmarks";
+import { DBAssetTypes } from "@hoarder/shared/utils/bookmarkUtils";
+
+import { getBookmarkDetails, updateAsset } from "./workerUtils";
 
 const metascraperParser = metascraper([
   metascraperAmazon(),
@@ -198,33 +196,6 @@ async function changeBookmarkStatus(
       crawlStatus,
     })
     .where(eq(bookmarkLinks.id, bookmarkId));
-}
-
-async function getBookmarkDetails(bookmarkId: string) {
-  const bookmark = await db.query.bookmarks.findFirst({
-    where: eq(bookmarks.id, bookmarkId),
-    with: {
-      link: true,
-      assets: true,
-    },
-  });
-
-  if (!bookmark || !bookmark.link) {
-    throw new Error("The bookmark either doesn't exist or not a link");
-  }
-  return {
-    url: bookmark.link.url,
-    userId: bookmark.userId,
-    screenshotAssetId: bookmark.assets.find(
-      (a) => a.assetType == AssetTypes.LINK_SCREENSHOT,
-    )?.id,
-    imageAssetId: bookmark.assets.find(
-      (a) => a.assetType == AssetTypes.LINK_BANNER_IMAGE,
-    )?.id,
-    fullPageArchiveAssetId: bookmark.assets.find(
-      (a) => a.assetType == AssetTypes.LINK_FULL_PAGE_ARCHIVE,
-    )?.id,
-  };
 }
 
 /**
@@ -554,26 +525,22 @@ async function crawlAndParseUrl(
       screenshotAssetId,
       oldScreenshotAssetId,
       bookmarkId,
-      AssetTypes.LINK_SCREENSHOT,
+      DBAssetTypes.LINK_SCREENSHOT,
       txn,
     );
     await updateAsset(
       imageAssetId,
       oldImageAssetId,
       bookmarkId,
-      AssetTypes.LINK_BANNER_IMAGE,
+      DBAssetTypes.LINK_BANNER_IMAGE,
       txn,
     );
   });
 
   // Delete the old assets if any
   await Promise.all([
-    oldScreenshotAssetId
-      ? deleteAsset({ userId, assetId: oldScreenshotAssetId }).catch(() => ({}))
-      : {},
-    oldImageAssetId
-      ? deleteAsset({ userId, assetId: oldImageAssetId }).catch(() => ({}))
-      : {},
+    silentDeleteAsset(userId, oldScreenshotAssetId),
+    silentDeleteAsset(userId, oldImageAssetId),
   ]);
 
   return async () => {
@@ -590,14 +557,12 @@ async function crawlAndParseUrl(
           fullPageArchiveAssetId,
           oldFullPageArchiveAssetId,
           bookmarkId,
-          AssetTypes.LINK_FULL_PAGE_ARCHIVE,
+          DBAssetTypes.LINK_FULL_PAGE_ARCHIVE,
           txn,
         );
       });
       if (oldFullPageArchiveAssetId) {
-        await deleteAsset({ userId, assetId: oldFullPageArchiveAssetId }).catch(
-          () => ({}),
-        );
+        await silentDeleteAsset(userId, oldFullPageArchiveAssetId);
       }
     }
   };
@@ -665,34 +630,9 @@ async function runCrawler(job: Job<ZCrawlLinkRequest, void>) {
 
   // Update the search index
   triggerSearchReindex(bookmarkId);
+  // Trigger a potential download of a video from the URL
+  triggerVideoWorker(bookmarkId, url);
 
   // Do the archival as a separate last step as it has the potential for failure
   await archivalLogic();
-}
-
-/**
- * Removes the old asset and adds a new one instead
- * @param newAssetId the new assetId to add
- * @param oldAssetId the old assetId to remove (if it exists)
- * @param bookmarkId the id of the bookmark the asset belongs to
- * @param assetType the type of the asset
- * @param txn the transaction where this update should happen in
- */
-async function updateAsset(
-  newAssetId: string | null,
-  oldAssetId: string | undefined,
-  bookmarkId: string,
-  assetType: AssetTypes,
-  txn: HoarderDBTransaction,
-) {
-  if (newAssetId) {
-    if (oldAssetId) {
-      await txn.delete(assets).where(eq(assets.id, oldAssetId));
-    }
-    await txn.insert(assets).values({
-      id: newAssetId,
-      assetType,
-      bookmarkId,
-    });
-  }
 }

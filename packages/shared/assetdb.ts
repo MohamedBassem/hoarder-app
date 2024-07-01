@@ -12,6 +12,7 @@ export const enum ASSET_TYPES {
   IMAGE_WEBP = "image/webp",
   APPLICATION_PDF = "application/pdf",
   TEXT_HTML = "text/html",
+  VIDEO_MP4 = "video/mp4",
 }
 
 export const IMAGE_ASSET_TYPES: Set<string> = new Set<string>([
@@ -24,6 +25,7 @@ export const IMAGE_ASSET_TYPES: Set<string> = new Set<string>([
 export const SUPPORTED_UPLOAD_ASSET_TYPES: Set<string> = new Set<string>([
   ...IMAGE_ASSET_TYPES,
   ASSET_TYPES.APPLICATION_PDF,
+  ASSET_TYPES.VIDEO_MP4,
 ]);
 
 // The assets that we support saving in the asset db
@@ -115,6 +117,20 @@ export async function readAsset({
 
   const metadata = zAssetMetadataSchema.parse(JSON.parse(metadataStr));
   return { asset, metadata };
+}
+
+/**
+ * Deletes the passed in asset if it exists and ignores any errors
+ * @param userId the id of the user the asset belongs to
+ * @param assetId the id of the asset to delete
+ */
+export async function silentDeleteAsset(
+  userId: string,
+  assetId: string | undefined,
+) {
+  if (assetId) {
+    await deleteAsset({ userId, assetId }).catch(() => ({}));
+  }
 }
 
 export async function deleteAsset({

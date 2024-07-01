@@ -60,6 +60,20 @@ function CachedContentSection({ link }: { link: ZBookmarkedLink }) {
   return <ScrollArea className="h-full">{content}</ScrollArea>;
 }
 
+function VideoSection({ link }: { link: ZBookmarkedLink }) {
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      <div className="absolute inset-0 h-full w-full">
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- captions not (yet) available */}
+        <video className="m-auto max-h-full max-w-full" controls>
+          <source src={`/api/assets/${link.videoAssetId}`} />
+          Not supported by your browser
+        </video>
+      </div>
+    </div>
+  );
+}
+
 export default function LinkContentSection({
   bookmark,
 }: {
@@ -76,6 +90,8 @@ export default function LinkContentSection({
     content = <CachedContentSection link={bookmark.content} />;
   } else if (section === "archive") {
     content = <FullPageArchiveSection link={bookmark.content} />;
+  } else if (section === "video") {
+    content = <VideoSection link={bookmark.content} />;
   } else {
     content = <ScreenshotSection link={bookmark.content} />;
   }
@@ -100,6 +116,9 @@ export default function LinkContentSection({
               disabled={!bookmark.content.fullPageArchiveAssetId}
             >
               Archive
+            </SelectItem>
+            <SelectItem value="video" disabled={!bookmark.content.videoAssetId}>
+              Video
             </SelectItem>
           </SelectGroup>
         </SelectContent>

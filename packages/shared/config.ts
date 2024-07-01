@@ -30,6 +30,9 @@ const allEnv = z.object({
   CRAWLER_STORE_SCREENSHOT: stringBool("true"),
   CRAWLER_FULL_PAGE_SCREENSHOT: stringBool("false"),
   CRAWLER_FULL_PAGE_ARCHIVE: stringBool("false"),
+  CRAWLER_VIDEO_DOWNLOAD: stringBool("false"),
+  CRAWLER_VIDEO_DOWNLOAD_MAX_SIZE: z.coerce.number().default(50),
+  CRAWLER_VIDEO_DOWNLOAD_TIMEOUT_SEC: z.coerce.number().default(10 * 60),
   MEILI_ADDR: z.string().optional(),
   MEILI_MASTER_KEY: z.string().default(""),
   LOG_LEVEL: z.string().default("debug"),
@@ -76,6 +79,9 @@ const serverConfigSchema = allEnv.transform((val) => {
       storeScreenshot: val.CRAWLER_STORE_SCREENSHOT,
       fullPageScreenshot: val.CRAWLER_FULL_PAGE_SCREENSHOT,
       fullPageArchive: val.CRAWLER_FULL_PAGE_ARCHIVE,
+      downloadVideo: val.CRAWLER_VIDEO_DOWNLOAD,
+      maxVideoDownloadSize: val.CRAWLER_VIDEO_DOWNLOAD_MAX_SIZE,
+      downloadVideoTimeout: val.CRAWLER_VIDEO_DOWNLOAD_TIMEOUT_SEC,
     },
     meilisearch: val.MEILI_ADDR
       ? {
