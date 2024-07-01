@@ -262,7 +262,7 @@ describe("Bookmark Routes", () => {
     const bookmarkWithDate = (date_ms: number) => ({
       userId: user.id,
       createdAt: new Date(date_ms),
-      type: BookmarkTypes.TEXT,
+      type: BookmarkTypes.TEXT as const,
     });
 
     // One normal bookmark
