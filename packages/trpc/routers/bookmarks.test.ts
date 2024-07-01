@@ -65,6 +65,69 @@ describe("Bookmark Routes", () => {
     expect(res.favourited).toBeTruthy();
   });
 
+  test<CustomTestContext>("update tags on bookmarks", async ({
+    apiCallers,
+  }) => {
+    const api = apiCallers[0].bookmarks;
+
+    // Create the bookmark
+    const bookmark = await api.createBookmark({
+      url: "https://google.com",
+      type: "link",
+    });
+
+    await api.updateTags({
+      bookmarkId: bookmark.id,
+      attach: [{ tagName: "asdf" }, { tagName: "qwer" }],
+      detach: [],
+    });
+
+    let res = await api.getBookmark({ bookmarkId: bookmark.id });
+    expect(res.tags.length).toBe(2);
+    for (const tag of res.tags) {
+      if (tag.name !== "qwer" && tag.name !== "asdf") {
+        throw new Error("tag.name is neither qwer nor asdf");
+      }
+    }
+
+    // Adding the same tags again, doesn't change anything
+    await api.updateTags({
+      bookmarkId: bookmark.id,
+      attach: [{ tagName: "asdf" }, { tagName: "qwer" }],
+      detach: [],
+    });
+    res = await api.getBookmark({ bookmarkId: bookmark.id });
+    expect(res.tags.length).toBe(2);
+
+    // Empty arrays don't do anything
+    await api.updateTags({
+      bookmarkId: bookmark.id,
+      attach: [],
+      detach: [],
+    });
+    res = await api.getBookmark({ bookmarkId: bookmark.id });
+    expect(res.tags.length).toBe(2);
+
+    await api.updateTags({
+      bookmarkId: bookmark.id,
+      attach: [],
+      detach: [{ tagName: "asdf" }, { tagName: "qwer" }],
+    });
+
+    res = await api.getBookmark({ bookmarkId: bookmark.id });
+    expect(res.tags.length).toBe(0);
+
+    // Removing the same tags again, does not do anything either
+    await api.updateTags({
+      bookmarkId: bookmark.id,
+      attach: [],
+      detach: [{ tagName: "asdf" }, { tagName: "qwer" }],
+    });
+
+    res = await api.getBookmark({ bookmarkId: bookmark.id });
+    expect(res.tags.length).toBe(0);
+  });
+
   test<CustomTestContext>("list bookmarks", async ({ apiCallers }) => {
     const api = apiCallers[0].bookmarks;
     const emptyBookmarks = await api.getBookmarks({});

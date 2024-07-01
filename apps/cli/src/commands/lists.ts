@@ -62,29 +62,33 @@ listsCmd
       .catch(printError(`Failed to delete list with id "${id}"`));
   });
 
+export async function addToList(listId: string, bookmarkId: string) {
+  const api = getAPIClient();
+
+  await api.lists.addToList
+    .mutate({
+      listId,
+      bookmarkId,
+    })
+    .then(
+      printSuccess(
+        `Successfully added bookmark "${bookmarkId}" to list with id "${listId}"`,
+      ),
+    )
+    .catch(
+      printError(
+        `Failed to add bookmark "${bookmarkId}" to list with id "${listId}"`,
+      ),
+    );
+}
+
 listsCmd
   .command("add-bookmark")
   .description("add a bookmark to list")
   .requiredOption("--list <id>", "the id of the list")
   .requiredOption("--bookmark <bookmark>", "the id of the bookmark")
   .action(async (opts) => {
-    const api = getAPIClient();
-
-    await api.lists.addToList
-      .mutate({
-        listId: opts.list,
-        bookmarkId: opts.bookmark,
-      })
-      .then(
-        printSuccess(
-          `Successfully added bookmark "${opts.bookmark}" to list with id "${opts.list}"`,
-        ),
-      )
-      .catch(
-        printError(
-          `Failed to add bookmark "${opts.bookmark}" to list with id "${opts.list}"`,
-        ),
-      );
+    await addToList(opts.list, opts.bookmark);
   });
 
 listsCmd

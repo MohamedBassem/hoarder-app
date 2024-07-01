@@ -32,14 +32,14 @@ export function TagsSelector({ bookmarkId }: { bookmarkId: string }) {
   const { mutate } = useUpdateBookmarkTags({
     onMutate: (req) => {
       req.attach.forEach((t) => currentlyUpdating.add(t.tagId ?? ""));
-      req.detach.forEach((t) => currentlyUpdating.add(t.tagId));
+      req.detach.forEach((t) => currentlyUpdating.add(t.tagId ?? ""));
     },
     onSettled: (_resp, _err, req) => {
       if (!req) {
         return;
       }
       req.attach.forEach((t) => currentlyUpdating.delete(t.tagId ?? ""));
-      req.detach.forEach((t) => currentlyUpdating.delete(t.tagId));
+      req.detach.forEach((t) => currentlyUpdating.delete(t.tagId ?? ""));
     },
   });
 

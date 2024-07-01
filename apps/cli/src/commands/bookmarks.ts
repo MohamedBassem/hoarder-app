@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import { addToList } from "@/commands/lists";
 import {
   printError,
   printObject,
@@ -23,7 +24,11 @@ function collect<T>(val: T, acc: T[]) {
   return acc;
 }
 
-function normalizeBookmark(bookmark: ZBookmark) {
+type Bookmark = Omit<ZBookmark, "tags"> & {
+  tags: string[];
+};
+
+function normalizeBookmark(bookmark: ZBookmark): Bookmark {
   const ret = {
     ...bookmark,
     tags: bookmark.tags.map((t) => t.name),
@@ -58,10 +63,17 @@ bookmarkCmd
     [],
   )
   .option("--stdin", "reads the data from stdin and store it as a note")
+  .option("--list <id>", "if set, the bookmark(s) will be added to this list")
+  .option(
+    "--tag <tag>",
+    "if set, this tag will be added to the bookmark(s). Specify multiple times to add multiple tags",
+    collect<string>,
+    [],
+  )
   .action(async (opts) => {
     const api = getAPIClient();
 
-    const results: object[] = [];
+    const results: Bookmark[] = [];
 
     const promises = [
       ...opts.link.map((url) =>
@@ -104,6 +116,12 @@ bookmarkCmd
 
     await Promise.allSettled(promises);
     printObject(results);
+    for (const bookmark of results) {
+      await updateTags(opts.tag, [], bookmark.id);
+      if (opts.list) {
+        await addToList(opts.list, bookmark.id);
+      }
+    }
   });
 
 bookmarkCmd
@@ -118,6 +136,48 @@ bookmarkCmd
       .catch(printError(`Failed to get the bookmark with id "${id}"`));
   });
 
+function printTagMessage(
+  tags: { tagName: string }[],
+  bookmarkId: string,
+  action: "Added" | "Removed",
+) {
+  tags.forEach((tag) => {
+    printStatusMessage(
+      true,
+      `${action} the tag ${tag.tagName} ${action === "Added" ? "to" : "from"} the bookmark with id ${bookmarkId}`,
+    );
+  });
+}
+
+async function updateTags(addTags: string[], removeTags: string[], id: string) {
+  const tagsToAdd = addTags.map((addTag) => {
+    return { tagName: addTag };
+  });
+
+  const tagsToRemove = removeTags.map((removeTag) => {
+    return { tagName: removeTag };
+  });
+
+  if (tagsToAdd.length > 0 || tagsToRemove.length > 0) {
+    const api = getAPIClient();
+    await api.bookmarks.updateTags
+      .mutate({
+        bookmarkId: id,
+        attach: tagsToAdd,
+        detach: tagsToRemove,
+      })
+      .then(() => {
+        printTagMessage(tagsToAdd, id, "Added");
+        printTagMessage(tagsToRemove, id, "Removed");
+      })
+      .catch(
+        printError(
+          `Failed to add/remove tags to/from bookmark with id "${id}"`,
+        ),
+      );
+  }
+}
+
 bookmarkCmd
   .command("update")
   .description("update a bookmark")
@@ -127,18 +187,34 @@ bookmarkCmd
   .option("--no-archive", "if set, the bookmark will be unarchived")
   .option("--favourite", "if set, the bookmark will be favourited")
   .option("--no-favourite", "if set, the bookmark will be unfavourited")
+  .option(
+    "--addtag <tag>",
+    "if set, this tag will be added to the bookmark. Specify multiple times to add multiple tags",
+    collect<string>,
+    [],
+  )
+  .option(
+    "--removetag <tag>",
+    "if set, this tag will be removed from the bookmark. Specify multiple times to remove multiple tags",
+    collect<string>,
+    [],
+  )
   .argument("<id>", "the id of the bookmark to get")
   .action(async (id, opts) => {
     const api = getAPIClient();
-    await api.bookmarks.updateBookmark
-      .mutate({
-        bookmarkId: id,
-        archived: opts.archive,
-        favourited: opts.favourite,
-        title: opts.title,
-      })
-      .then(printObject)
-      .catch(printError(`Failed to update bookmark with id "${id}"`));
+    await updateTags(opts.addtag, opts.removetag, id);
+
+    if ("archive" in opts || "favourite" in opts || "title" in opts) {
+      await api.bookmarks.updateBookmark
+        .mutate({
+          bookmarkId: id,
+          archived: opts.archive,
+          favourited: opts.favourite,
+          title: opts.title,
+        })
+        .then(printObject)
+        .catch(printError(`Failed to update bookmark with id "${id}"`));
+    }
   });
 
 bookmarkCmd
